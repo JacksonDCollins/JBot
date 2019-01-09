@@ -1,6 +1,8 @@
 from structs import Vector3, Rotator
 from PID import PID
 import math
+import bezier
+import numpy as np
 
 TICK = 1.0/60.0
 FIELD_LENGTH = 10280
@@ -157,3 +159,25 @@ def dpp(target_loc,target_vel,our_loc,our_vel):
 		return (((target_loc.x - our_loc.x) * (target_vel.x - our_vel.x)) + ((target_loc.y - our_loc.y) * (target_vel.y - our_vel.y)))/d
 	else:
 		return 0
+	
+def get_curve(point1, point2, curve_point, facing = Rotator(0,0,0)):
+	direction = sign(angle2D(point1, point2, True))
+	amp = abs(angle2D(point1, point2, True))
+
+	mid_point = find_point_on_line(point1, point2, 0.5)
+	
+	angle_vec1 = point_on_circle(mid_point, curve_point*math.pi/2, 1, facing)
+	# angle_vec2 = point_on_circle(mid_point, -1*direction*math.pi/2, 1, facing)
+
+	angle_vec = angle_vec1
+	# if distance2D(angle_vec2, curve_point) > distance2D(angle_vec1, curve_point):
+	# 	angle_vec = angle_vec2
+
+	turn_point = find_point_on_line(mid_point, angle_vec, distance2D(point1, point2)/amp)
+
+	x = [point1.x, turn_point.x, point2.x]
+	y = [point1.y, turn_point.y, point2.y]
+	nodes = np.asfortranarray([x,y])
+	curve = bezier.Curve(nodes, 0)
+
+	return curve

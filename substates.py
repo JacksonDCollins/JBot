@@ -7,6 +7,8 @@ import utils
 import structs
 import math
 import time
+import bezier
+import numpy as np
 
 def pick_state(master, agent, car, target, speed, hierarchy = None):
 	if master.substate.expired:
@@ -140,13 +142,26 @@ class move():
 		
 		# self.agent.renderer.draw_rect_3d(point.tuple, 10, 10, True, self.agent.renderer.blue())
 		
-		
 		if utils.distance2D(point, self.target) < turn_radius:
 			to_target = utils.localize(self.target, self.car).normalize(turn_radius)
 			self.target = self.car.location - to_target
 			self.controls.boost = False
-		self.controls.steer = utils.steer(self.target, self.car)
+			
+		else:
+			curve = utils.get_curve(self.car.location, self.target, utils.sign(angle_to_target), self.car.rotation)
+			points = curve.evaluate_multi(np.linspace(0, 1.0, 100))
+
+			'''
+			USE OFFSET FROM GOAL TO BALL AS POINT IN CURVE
+			'''
+			
+			
+			
+			
+			curve_points = [[points[0][i], points[1][i]] for i in range(len(points[0]))]
+			self.agent.renderer.draw_polyline_3d(curve_points, self.agent.renderer.green())
 		
+		self.controls.steer = utils.steer(self.target, self.car)
 		self.agent.renderer.draw_rect_3d(self.target.tuple, 10, 10, True, self.agent.renderer.red())
 		self.agent.renderer.draw_line_3d(self.car.location.flatten().tuple, self.target.flatten().tuple, self.agent.renderer.green())
 
