@@ -1,59 +1,224 @@
+from RLUtilities.Maneuvers import AerialTurn
+from RLUtilities.GameInfo import GameInfo
+
+from rlbot.agents.base_agent import SimpleControllerState
+
+import utils
+import structs
+import math
 import time
-from Util import *
 
-from RLUtilities.Maneuvers import AerialTurn, Drive
+def pick_state(master, agent, car, target, speed, hierarchy = None):
+	if master.substate.expired:
+		if hierarchy:
+			for substate in hierarchy:
+				if substate(master, agent, car, target, speed).available():
+					if substate(master, agent, car, target, speed).name == master.substate.name:
+						master.substate.update(master, agent, car, target, speed)
+						return master.substate
+					else:
+						return substate(master, agent, car, target, speed)
+		else: 
+			hierarchy = [recover, dodge, move]
+			return pick_state(master, agent, car, target, speed, hierarchy)
+	master.substate.update(master, agent, car, target, speed)
+	return master.substate
 
-class moveSub:
-	def __init__(self):
-		self.name = 'move'
+
+class move():
+	def __init__(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.name = 'MOVE'
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		self.controls = SimpleControllerState()
 		self.expired = False
-		self.action = None 
+		self.to_hit = []
+		self.cur_hit = 0
+		self.last_target_ang = structs.Rotator(0,0,0)
+	
+	def update(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
 
-	def execute(self, agent, location, speed, cs, current_speed, angle, boost = False, *args, **vargs):
-		# self.action = Drive(agent.game_info.my_car, vec3(vargs['t'].x, vargs['t'].y, vargs['t'].z), speed)
+	def available(self):
+		return True
 
-		# self.action.step(1.0/60.0)
-		# return self.action.controls
-		cs.steer = steer(angle)
-		if not boost:
-			if current_speed < speed:
-				cs.throttle = 1.0
-			elif current_speed - 50 > speed:
-				cs.throttle = -1.0
-			else:
-				cs.throttle = 0
-		else:
-			cs.throttle, cs.boost = throttle(agent, speed)
+	def step(self, tick):
+		# if self.target == self.master.ball.location:
+		# 	self.master.ball.step(tick)
+		# 	self.target = self.master.ball.location
+
 		
-		if 'n' in vargs:
-			if vargs['n'] > 1:
-				cs.handbrake = True
-				cs.throttle = 1
-				cs.boost = False
+		# if self.agent.team == 0: print(utils.steer(self.target, self.car), utils.angle2D(self.target, self.car), self.target.tuple, self.car.location.tuple)
+		
+		# self.controls.yaw = utils.steer(self.target, self.car)
+		self.controls.throttle, self.controls.boost = utils.throttle(self.car, self.speed)
+
+		turn_radius = utils.turn_radius(self.car, self.target)
+		angle_to_target = utils.angle2D(self.target, self.car)
+
+		point = utils.point_on_circle(self.car, utils.sign(angle_to_target)*math.pi/2, turn_radius)#, self.car.rotation)
+		circle = []
+		for i in range(0, 366, 6):
+			n = utils.point_on_circle(point, math.radians(i), turn_radius)#, point.rotation)
+			circle.append(n.tuple)
+		self.agent.renderer.draw_polyline_3d(circle, self.agent.renderer.red())
+		
+		
+		# ball_prediction = self.agent.get_ball_prediction_struct()
+		# if ball_prediction is not None:
+		# 	# for i in range(0, ball_prediction.num_slices):
+		# 	if self.target == self.master.ball.location:
+		# 		self.target = structs.Vector3(ball_prediction.slices[10].physics.location)
+		# 		turn_radius = utils.turn_radius(self.car, self.target)
+
+		
+		# goal_to_ball_uv = (self.agent.game_info.their_goal.location - self.agent.game_info.ball.location).normalize()
+		# yaw = math.atan2(goal_to_ball_uv.x, goal_to_ball_uv.z) #math.atan((goal_to_ball_uv.x/(-goal_to_ball_uv.y)))#
+		# pitch = 0#math.atan(math.hypot(goal_to_ball_uv.x, goal_to_ball_uv.y)/goal_to_ball_uv.z)
+
+		# target_ang = structs.Rotator(pitch, yaw, 0)
+
+		# circle_point = utils.point_on_circle(self.target, math.pi/2, turn_radius, target_ang)
+		# circle = []
+		# for i in range(0, 366, 6):
+		# 	n = utils.point_on_circle(circle_point, math.radians(i), turn_radius)
+		# 	circle.append(n.tuple)
+		# self.agent.renderer.draw_polyline_3d(circle, self.agent.renderer.black())
+		
+		# x1 = point.x
+		# y1 = point.y
+		# x2 = circle_point.x
+		# y2 = circle_point.y
+		
+		# gamma = -math.atan((y2-y1)/(x2-x1))
+		# beta = math.asin((turn_radius-turn_radius)/math.sqrt((x2-x1)**2 + (y2-y1)**2))
+		# alpha = gamma-beta
+
+		# x3 = x1 - turn_radius*math.cos((math.pi/2)-alpha)
+		# y3 = y1 - turn_radius*math.sin((math.pi/2)-alpha)
+		# x4 = x2 + turn_radius*math.cos((math.pi/2)-alpha)
+		# y4 = y2 + turn_radius*math.sin((math.pi/2)-alpha)
+
+		# tang1 = structs.Vector3(x3, y3, 100)
+		# tang2 = structs.Vector3(x4, y4, 100)
+		
+		# if self.last_target_ang != target_ang:
+		# 	print('ye')
+		# 	self.cur_hit = 0
+		# 	self.last_target_ang = target_ang
+		
+		# self.to_hit = [tang1, tang2, self.agent.game_info.ball.location]
+		
+		# self.agent.renderer.draw_rect_3d(self.to_hit[0].tuple, 20, 20, True, self.agent.renderer.black())
+		# self.agent.renderer.draw_rect_3d(self.to_hit[1].tuple, 20, 20, True, self.agent.renderer.black())
+
+
+		# point_to_target = utils.distance2D(self.target, point)
+		# if point_to_target < turn_radius:
+		# 	#inside circle
+		# 	if abs(utils.angle2D(self.target, self.car)) < math.pi/2:
+		# 		to_target = utils.localize(self.target, self.car).normalize(turn_radius)
+		# 		self.target = self.car.location - to_target
+		# 		self.controls.boost = 0
+		# 		self.controls.throttle = 0
+		# 	else:
+		# 		to_target = utils.localize(self.target, self.car).normalize(turn_radius)
+		# 		self.target = self.car.location - to_target
+		# 		self.controls.boost = 0
+		# 		self.controls.handbrake = 1
+		
+		
+
+		# point2 = structs.Vector3(x,y,z)
+		
+		# self.agent.renderer.draw_rect_3d(point.tuple, 10, 10, True, self.agent.renderer.blue())
+		
+		
+		if utils.distance2D(point, self.target) < turn_radius:
+			to_target = utils.localize(self.target, self.car).normalize(turn_radius)
+			self.target = self.car.location - to_target
+			self.controls.boost = False
+		self.controls.steer = utils.steer(self.target, self.car)
+		
+		self.agent.renderer.draw_rect_3d(self.target.tuple, 10, 10, True, self.agent.renderer.red())
+		self.agent.renderer.draw_line_3d(self.car.location.flatten().tuple, self.target.flatten().tuple, self.agent.renderer.green())
 
 		self.expired = True
-		return cs
+		return self.controls
 
-class boostSub:
-	def __init__(self):
-		self.name = 'boost'
+class recover():
+	def __init__(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.name = 'RECOVER'
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		self.controls = SimpleControllerState()
 		self.expired = False
+		self.Ginfo = GameInfo(agent.index, agent.team)
 
-	def cavailable(self, agent, cond):
-		if cond:
-			agent.start = time.time()
+	def update(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		self.Ginfo = GameInfo(agent.index, agent.team)
+
+	def available(self):
+		return not self.car.has_wheel_contact
+
+	def step(self, tick):
+		self.Ginfo.read_packet(self.agent.packet)	
+		action = AerialTurn(self.Ginfo.my_car)
+		action.step(tick)
+		action.controls.throttle = 1
+
+		self.expired = action.finished
+		self.expired = self.car.has_wheel_contact
+
+		return action.controls
+
+class dodge():
+	def __init__(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.name = 'DODGE'
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		self.controls = SimpleControllerState()
+		self.expired = False
+		# self.agent.dodgeTimer = time.time()
+	
+	def update(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		print(self.expired)
+
+	def available(self):
+		td = time.time() - self.agent.dodgeTimer
+		if td > 2.2  and abs(utils.angle2D(self.target, self.car)) < 1 and utils.velocity2D(self.car) < self.speed and utils.distance2D(self.target, self.car.location) > (utils.velocity2D(self.car)*2.3):
+			self.agent.dodgeTimer = time.time()
 			return True
 		return False
 
-	def available(self, agent, angle_to_target, current_speed, speed, target):
-		td = time.time() - agent.start
-		if td > 2.2  and abs(angle_to_target) < 1 and current_speed < speed and distance2D(target,agent.me) > (velocity2D(agent.me)*2.3):
-			agent.start = time.time()
-			return True
-		return False
-
-	def execute(self, agent, location, speed, cs, current_speed, angle, *args, **vargs):
-		td = time.time() - agent.start
+	def step(self, tick):
+		cs = self.controls
+		angle = utils.angle2D(self.target, self.car)
+		td = time.time() - self.agent.dodgeTimer
+		# cs.throttle, cs.boost = utils.throttle(self.car, self.speed)
 		if td <= 0.1:
 			cs.jump = True
 			cs.pitch = -1
@@ -62,28 +227,47 @@ class boostSub:
 			cs.pitch = -1
 		elif td > 0.15 and td < 1:
 			cs.jump = True
-			cs.yaw = steer(angle)
+			cs.yaw = utils.steer(angle)
 			cs.pitch = -1
-		elif td > 1:
 			self.expired = True
-			agent.start = time.time()
-
+			self.agent.dodgeTimer = time.time()
+		elif td > 2:
+			self.expired = True
+			self.agent.dodgeTimer = time.time()
 		return cs
 
-class shotSub:
-	def __init__(self):
-		self.name = 'shot'
+class shoot():
+	def __init__(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.name = 'SHOOT'
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
+		self.controls = SimpleControllerState()
 		self.expired = False
+		# self.agent.dodgeTimer = time.time()
+	
+	def update(self, master = None, agent = None, car = None, target = None, speed = None):
+		self.master = master
+		self.agent = agent
+		self.car = car
+		self.target = target
+		self.speed = speed
 
-	def available(self, agent, target):
-		td = time.time() - agent.start
-		if (ballReady(agent) and td > 2.2 and distance2D(target,agent.me) <= 270):
-			agent.start = time.time()
+	def available(self):
+		td = time.time() - self.agent.dodgeTimer
+		if (utils.ballReady(self.master) and td > 2.2 and utils.distance2D(self.target,self.car.location) <= 270):
+			self.agent.dodgeTimer = time.time()
 			return True
 		return False
 
-	def execute(self, agent, location, speed, cs, current_speed, angle, *args, **vargs):
-		td = time.time() - agent.start
+	def step(self, tick):
+		goal_angle = utils.angle2D(self.agent.game_info.their_goal.location, self.car)
+
+		cs = self.controls
+		# angle = utils.angle2D(self.target, self.car)
+		td = time.time() - self.agent.dodgeTimer
 		if td <= 0.1:
 			cs.jump = True
 			cs.pitch = -1
@@ -92,67 +276,18 @@ class shotSub:
 			cs.pitch = -1
 		elif td > 0.15 and td < 1:
 			cs.jump = True
-			try:
-				cs.yaw = math.sin(vargs['goal_angle'])
-				cs.pitch = -abs(math.cos(vargs['goal_angle']))
-			except:
-				pass
+			cs.yaw = math.sin(goal_angle)
+			cs.pitch = -abs(math.cos(goal_angle))
 		elif td > 1:
 			self.expired = True
-			agent.start = time.time()
+			self.agent.dodgeTimer = time.time()
 		return cs
 
-class recoverSub:
-	def __init__(self):
-		self.name = 'recover'
-		self.expired = False
-		self.action = None
-		
-	def available(self, agent):
-		return not agent.me.car.has_wheel_contact
+class default():
+	def __init__(self, *args):
+		self.name = 'DEFAULT'
+		self.expired = True
+		self.target_ang = structs.Rotator(0,0,0)
 
-	def execute(self, agent, location, speed, cs, *args, **vargs):
-		if self.action == None:
-			self.action = AerialTurn(agent.game_info.my_car)
-
-		red = agent.renderer.create_color(255, 255, 30, 30)
-		agent.renderer.draw_polyline_3d(self.action.trajectory, red)
-		
-		self.action.step(1.0 / 60.0)
-
-		self.expired = self.action.finished
-
-		return self.action.controls
-
-		
-		# loc = toLocal(location, agent.me)
-
-		
-		# # pitch_angle = angle2D(agent.me.rotation, nullvec)
-		# # yaw_angle = angle2D(agent.me, location)
-		# # roll_angle = angle2D(agent.me.rotation, nullvec)
-		# future_time = timeZCar(agent.me)
-		# future_loc = future(agent.me, future_time)
-		# if abs(future_loc.x) > FIELD_WIDTH/2 or abs(future_loc.y) > FIELD_LENGTH/2:
-		# 	print('wall')
-		# 	des_ang = Vector3([math.pi/2, angle2D(agent.me, loc), math.pi/2])
-		# else:
-		# 	print('floor')
-		# 	des_ang = Vector3([0, 0, 0])
-		
-		# # des_ang = find_landing_orientation(agent, 200)
-
-		
-		# # print(future_loc)
-		# # print(AerialTurn)
-
-		# cs.pitch, cs.yaw, cs.roll = get_req_ypr(agent.me, des_ang)
-		# cs.throttle = 1
-		# if agent.me.location.x < 60:
-		# 	cs.jump = True
-
-		# # print(agent.me.rotation)
-		# self.expired = agent.me.car.has_wheel_contact
-
-		
-		# return cs
+	def step(self, *args):
+		return SimpleControllerState()
