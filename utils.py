@@ -160,24 +160,50 @@ def dpp(target_loc,target_vel,our_loc,our_vel):
 	else:
 		return 0
 	
-def get_curve(point1, point2, curve_point, facing = Rotator(0,0,0)):
-	direction = sign(angle2D(point1, point2, True))
-	amp = abs(angle2D(point1, point2, True))
+def get_curve(points, ori, facing = Rotator(0,0,0), car = None):
+	tpi = points.index('TP')
 
-	mid_point = find_point_on_line(point1, point2, 0.5)
+	direction = sign(angle2D(points[tpi-1], points[tpi+1], True))
+	amp = abs(angle2D(points[tpi-1], points[tpi+1], True))
+
+	mid_point = find_point_on_line(points[tpi-1], points[tpi+1], 0.5)
 	
-	angle_vec1 = point_on_circle(mid_point, curve_point*math.pi/2, 1, facing)
-	# angle_vec2 = point_on_circle(mid_point, -1*direction*math.pi/2, 1, facing)
+	angle_vec = point_on_circle(mid_point, ori*math.pi/2, 1, facing)
 
-	angle_vec = angle_vec1
-	# if distance2D(angle_vec2, curve_point) > distance2D(angle_vec1, curve_point):
-	# 	angle_vec = angle_vec2
+	angle = angle2D(mid_point, car)
+	h = abs(distance2D(points[0],mid_point)/math.cos(angle))
+	# print(h)
 
-	turn_point = find_point_on_line(mid_point, angle_vec, distance2D(point1, point2)/amp)
+	turn_point = find_point_on_line(mid_point, angle_vec, h/amp)
 
-	x = [point1.x, turn_point.x, point2.x]
-	y = [point1.y, turn_point.y, point2.y]
+	points[tpi] = turn_point
+
+	x = [point.x for point in points]
+	y = [point.y for point in points]
 	nodes = np.asfortranarray([x,y])
-	curve = bezier.Curve(nodes, 0)
+	return nodes, bezier.Curve.from_nodes(nodes)
 
-	return curve
+	
+
+def map(value, leftMin, leftMax, rightMin, rightMax):
+    # Figure out how 'wide' each range is
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
+
+    # Convert the left range into a 0-1 range (float)
+    valueScaled = float(value - leftMin) / float(leftSpan)
+
+    # Convert the 0-1 range into a value in the right range.
+    return rightMin + (valueScaled * rightSpan)
+
+def rotate(v1,theta, dimension = 2):
+	
+	rotate_matrix = [[math.cos(theta), -math.sin(theta)],
+					 [math.sin(theta), math.cos(theta)]]
+	
+	vector = v1[:dimension]
+	
+	rotated = [vector[0]*rotate_matrix[0][0] + vector[1]*rotate_matrix[1][0],
+			   vector[0]*rotate_matrix[1][0] + vector[1]*rotate_matrix[1][1]]
+	
+	return Vector3(rotated[0], rotated[1], 0)

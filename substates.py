@@ -5,6 +5,7 @@ from rlbot.agents.base_agent import SimpleControllerState
 
 import utils
 import structs
+import states
 import math
 import time
 import bezier
@@ -37,10 +38,8 @@ class move():
 		self.speed = speed
 		self.controls = SimpleControllerState()
 		self.expired = False
-		self.to_hit = []
-		self.cur_hit = 0
-		self.last_target_ang = structs.Rotator(0,0,0)
-	
+		self.path = None
+
 	def update(self, master = None, agent = None, car = None, target = None, speed = None):
 		self.master = master
 		self.agent = agent
@@ -142,26 +141,47 @@ class move():
 		
 		# self.agent.renderer.draw_rect_3d(point.tuple, 10, 10, True, self.agent.renderer.blue())
 		
-		if utils.distance2D(point, self.target) < turn_radius:
+		
+		
+		if isinstance(self.master, states.quickShoot):
+			if self.path:
+				if not self.path.on_path(self.car.location):
+					self.path = None
+					print('yes')
+				else:
+					curvetarget = self.path.evaluate(0.05)
+					curvetarget = structs.Vector3(curvetarget[0], curvetarget[1], 0)
+					self.controls.steer = utils.steer(curvetarget, self.car)
+					self.agent.renderer.draw_rect_3d(curvetarget.tuple, 10, 10, True, self.agent.renderer.blue())
+			if not self.path:
+				b_prediction = self.agent.get_ball_prediction_struct()
+
+				target = utils.find_point_on_line(self.agent.game_info.their_goal.location, self.target, -.05)
+				self.path = structs.Path([self.car.location, utils.point_on_circle(self.car, 0, 500), 'TP', target, self.target], utils.sign(angle_to_target), self.car.rotation, self.car)
+				
+				
+				
+
+				angletotarget = utils.map(abs(utils.angle2D(self.target, self.car)), 0, math.pi, 0, math.pi)
+				curvetarget = self.path.evaluate(0.05)
+				curvetarget = structs.Vector3(curvetarget[0], curvetarget[1], 0)
+				self.agent.renderer.draw_rect_3d(curvetarget.tuple, 10, 10, True, self.agent.renderer.blue())
+
+				self.controls.steer = utils.steer(curvetarget, self.car)
+
+
+		elif utils.distance2D(point, self.target) < turn_radius:
 			to_target = utils.localize(self.target, self.car).normalize(turn_radius)
 			self.target = self.car.location - to_target
 			self.controls.boost = False
-			
-		else:
-			curve = utils.get_curve(self.car.location, self.target, utils.sign(angle_to_target), self.car.rotation)
-			points = curve.evaluate_multi(np.linspace(0, 1.0, 100))
-
-			'''
-			USE OFFSET FROM GOAL TO BALL AS POINT IN CURVE
-			'''
-			
-			
-			
-			
-			curve_points = [[points[0][i], points[1][i]] for i in range(len(points[0]))]
-			self.agent.renderer.draw_polyline_3d(curve_points, self.agent.renderer.green())
+			self.controls.steer = utils.steer(self.target, self.car)
 		
-		self.controls.steer = utils.steer(self.target, self.car)
+		else:
+			self.controls.steer = utils.steer(self.target, self.car)
+		
+		if self.path:
+			# print(self.path.on_path(self.car.location))
+			self.agent.renderer.draw_polyline_3d(self.path.get_path_points(np.linspace(0, 1.0, 100)), self.agent.renderer.green())
 		self.agent.renderer.draw_rect_3d(self.target.tuple, 10, 10, True, self.agent.renderer.red())
 		self.agent.renderer.draw_line_3d(self.car.location.flatten().tuple, self.target.flatten().tuple, self.agent.renderer.green())
 
@@ -220,7 +240,6 @@ class dodge():
 		self.car = car
 		self.target = target
 		self.speed = speed
-		print(self.expired)
 
 	def available(self):
 		td = time.time() - self.agent.dodgeTimer

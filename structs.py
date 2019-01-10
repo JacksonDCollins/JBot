@@ -1,5 +1,7 @@
 import math
 import utils
+import bezier
+import numpy as np 
 
 class Game():
 	def __init__(self, BaseAgent, index, team):
@@ -23,7 +25,7 @@ class Game():
 			self.cars.append(lcar)
 
 		self.my_goal = Goal(self.team, Vector3(0.0, utils.sign(self.team)*5120.0, 312.0))
-		self.their_goal = Goal(self.team, Vector3(0.0, utils.opp(utils.sign(self.team))*5120.0, 312.0))
+		self.their_goal = Goal(self.team, Vector3(0.0, utils.sign(utils.opp(self.team))*5120.0, 312.0))
 		self.goals = [self.my_goal, self.their_goal]
 
 		self.ball = Ball(packet.game_ball)
@@ -127,6 +129,9 @@ class Vector3():
 		return Vector3(self.points[0]-value.points[0],self.points[1]-value.points[1],self.points[2]-value.points[2])
 	def __mul__(self,value):
 		return (self.points[0]*value.points[0] + self.points[1]*value.points[1] + self.points[2]*value.points[2])
+	def __getitem__(self, key):
+		return self.points[key]
+
 	def mag(self):
 		return math.sqrt(self.points[0]**2 + self.points[1]**2 + self.points[2]**2)
 	def normalize(self, units = 1):
@@ -173,3 +178,32 @@ class Rotator():
 	@property
 	def tuple(self):
 		return tuple(self.points)
+	
+	
+class Path(bezier.Curve):
+	def __init__(self, points, ori, facing = Vector3(0,0,0), car = None):
+		nodes, degrees = utils.get_curve(points, ori, facing, car)
+		super().__init__(nodes, degrees)
+	
+	def get_path_points(self, linspace):
+		points = self.evaluate_multi(linspace)
+			
+		return [[points[0][i], points[1][i]] for i in range(len(points[0]))]
+	
+	def on_path(self, location):
+		point = np.asfortranarray([[location.x], [location.y]])
+		point = self.locate(point)
+		if point == None: 
+			return False
+		else:
+			return True
+		
+class test(bezier.Curve):
+	def __init__(self, nodes, degrees):
+		super().__init__(nodes, degrees)
+		
+	
+	def get_path_points(self):
+		points = self.evaluate_multi(np.linspace(0.0, 1.0, 100))
+			
+		return [[points[0][i], points[1][i]] for i in range(len(points[0]))]

@@ -5,6 +5,8 @@ import substates
 import gc
 import time
 import math
+import numpy as np
+import bezier
 from PID import PID
 
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
@@ -12,7 +14,7 @@ from rlbot.utils.structures.game_data_struct import GameTickPacket
 from structs import Game
 from rlbot.utils.game_state_util import GameState, BallState, CarState, Physics, Vector3 as rlv3, Rotator
 
-TEST = True
+TEST = False
 
 class Steamroller(BaseAgent):
 	def initialize_agent(self):
@@ -40,7 +42,7 @@ class Steamroller(BaseAgent):
 		if TEST:
 			if not self.game_info.ball.location.x == -1000.0:## if not self.touch == self.game_info.ball.latest_touch.time_seconds:
 				self.touch = self.game_info.ball.latest_touch.time_seconds
-				self.state = testState(self)
+			self.state = testState(self)
 
 		controls = self.state.execute()
 		self.renderer.draw_string_3d(self.game_info.my_car.location.tuple, 2, 2, f'{self.state.name}, {self.state.substate.name}', self.renderer.white())
@@ -122,7 +124,7 @@ class testState():
 	def execute(self):
 		
 		car_state = CarState(jumped=False, double_jumped=False, boost_amount=87, 
-                     physics=Physics(location = rlv3(1000, 2000, 20), velocity=rlv3(0,0,0), rotation=rlv3(0,0,0), angular_velocity=rlv3(0,0,0)))
+                     physics=Physics(location = rlv3(1000, 2000, 20), velocity=rlv3(0,0,0), rotation=rlv3(0,-1,0), angular_velocity=rlv3(0,0,0)))
 
 		ball_state = BallState(Physics(location=rlv3(-1000, -1100, 100), velocity=rlv3(0,0,0), rotation=rlv3(0,0,0), angular_velocity=rlv3(0,0,0)))
 
@@ -130,6 +132,16 @@ class testState():
 
 		self.agent.set_game_state(game_state)
 		self.expired = True
+
 	
+		r = 1000
+		x = [r/2, -r, -r, r, r, -r/2]
+		y = [-r/2, -r, r, r, -r, -r/2]
+		nodes = np.asfortranarray([x,y])
+		curve =  structs.test(nodes, bezier.Curve.from_nodes(nodes))
+		
+
+		self.agent.renderer.draw_polyline_3d(curve.get_path_points(), self.agent.renderer.blue())
+
 		self.substate = substates.pick_state(self, self.agent, self.car, self.ball.location, 2300, self.hierarchy)# Drive(self.car, target, 2000)
 		return self.substate.step(1.0/60.0)

@@ -192,10 +192,9 @@ class quickShoot():
 		offset = (target.x / utils.FIELD_WIDTH) * math.pi
 		x = target.x + 90 * abs(math.cos(offset)) * utils.sign(offset)
 		y = target.y + 90 * abs(math.sin(offset)) * utils.sign(self.agent.team)
-		target = Vector3(x,y,target.z)
+		# target = Vector3(x,y,target.z)
 
-		goal_offset_vec = (target - self.agent.game_info.their_goal.location).normalize(utils.distance2D(self.car.location, target))
-		target += goal_offset_vec
+		
 		
 
 		self.substate = substates.pick_state(self, self.agent, self.car, target, 2400, self.hierarchy)
@@ -217,6 +216,7 @@ class calcShoot():
 		self.expired = False
 	
 	def available(self):
+		return False
 		if utils.ballReady(self) and abs(self.ball.location.y) < 5050 and utils.ballProject(self) > 500 - (utils.distance2D(self.ball.location, self.car.location)/2):
 			return True
 		return False
