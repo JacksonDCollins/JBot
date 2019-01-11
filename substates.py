@@ -146,10 +146,10 @@ class move():
 		if isinstance(self.master, states.quickShoot):
 			if self.path:
 				if not self.path.on_path(self.car.location):
-					self.path = None
+					# self.path = None
 					print('yes')
 				else:
-					curvetarget = self.path.evaluate(0.05)
+					curvetarget = self.path.evaluate(0.1)
 					curvetarget = structs.Vector3(curvetarget[0], curvetarget[1], 0)
 					self.controls.steer = utils.steer(curvetarget, self.car)
 					self.agent.renderer.draw_rect_3d(curvetarget.tuple, 10, 10, True, self.agent.renderer.blue())
@@ -157,13 +157,13 @@ class move():
 				b_prediction = self.agent.get_ball_prediction_struct()
 
 				target = utils.find_point_on_line(self.agent.game_info.their_goal.location, self.target, -.05)
-				self.path = structs.Path([self.car.location, utils.point_on_circle(self.car, 0, 500), 'TP', target, self.target], utils.sign(angle_to_target), self.car.rotation, self.car)
+				self.path = structs.Path(self.agent, [self.car.location, utils.point_on_circle(self.car, 0, 500), 'TP', target, self.target], utils.sign(angle_to_target), self.car.rotation, self.car)
 				
 				
 				
 
 				angletotarget = utils.map(abs(utils.angle2D(self.target, self.car)), 0, math.pi, 0, math.pi)
-				curvetarget = self.path.evaluate(0.05)
+				curvetarget = self.path.evaluate(0.1)
 				curvetarget = structs.Vector3(curvetarget[0], curvetarget[1], 0)
 				self.agent.renderer.draw_rect_3d(curvetarget.tuple, 10, 10, True, self.agent.renderer.blue())
 

@@ -181,9 +181,11 @@ class Rotator():
 	
 	
 class Path(bezier.Curve):
-	def __init__(self, points, ori, facing = Vector3(0,0,0), car = None):
-		nodes, degrees = utils.get_curve(points, ori, facing, car)
-		super().__init__(nodes, degrees)
+	def __init__(self, master, points, ori, facing = Vector3(0,0,0), car = None):
+		nodes, degree = utils.get_curve(points, ori, facing, car)
+		self.mnodes = nodes
+		self.master = master
+		super().__init__(nodes, degree)
 	
 	def get_path_points(self, linspace):
 		points = self.evaluate_multi(linspace)
@@ -192,11 +194,61 @@ class Path(bezier.Curve):
 	
 	def on_path(self, location):
 		point = np.asfortranarray([[location.x], [location.y]])
-		point = self.locate(point)
-		if point == None: 
+		# point = self.locate(point)
+		# if point == None: 
+		# 	return False
+		# else:
+		# 	return True
+
+		candidates = [(0.0, 1.0, self.mnodes)]
+		for _ in range(bezier._curve_helpers._MAX_LOCATE_SUBDIVISIONS + 1):
+			next_candidates = []
+			for start, end, candidate in candidates:
+				if self.contains_nd(candidate, point.ravel(order="F")):
+					midpoint = 0.5 * (start + end)
+					left, right = bezier._curve_helpers.subdivide_nodes(candidate)
+					next_candidates.extend(
+						((start, midpoint, left), (midpoint, end, right))
+					)
+			candidates = next_candidates
+		if not candidates:
 			return False
+			return None
+
+		params = [(start, end) for start, end, _ in candidates]
+		if np.std(params) > bezier._curve_helpers._LOCATE_STD_CAP:
+			raise ValueError("Parameters not close enough to one another", params)
+
+		s_approx = np.mean(params)
+		
+		s_approx = bezier._curve_helpers.newton_refine(self.mnodes, point, s_approx)
+		# NOTE: Since ``np.mean(params)`` must be in ``[0, 1]`` it's
+		#       "safe" to push the Newton-refined value back into the unit
+		#       interval.
+		if s_approx < 0.0:
+			return True
+			return 0.0
+
+		elif s_approx > 1.0:
+			return True
+			return 1.0
+
 		else:
 			return True
+			return s_approx
+	
+	def contains_nd(self, nodes, point):
+		p = [[nodes[0][i], nodes[1][i]] for i in range(len(nodes[0]))]
+		self.master.renderer.draw_polyline_3d(p, self.master.renderer.black())
+		min_vals = np.min(nodes, axis=1)
+		if not np.all(min_vals <= point):
+			return False
+
+		max_vals = np.max(nodes, axis=1)
+		if not np.all(point <= max_vals):
+			return False
+
+		return True
 		
 class test(bezier.Curve):
 	def __init__(self, nodes, degrees):

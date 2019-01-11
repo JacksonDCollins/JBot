@@ -14,7 +14,7 @@ from rlbot.utils.structures.game_data_struct import GameTickPacket
 from structs import Game
 from rlbot.utils.game_state_util import GameState, BallState, CarState, Physics, Vector3 as rlv3, Rotator
 
-TEST = False
+TEST = True
 
 class Steamroller(BaseAgent):
 	def initialize_agent(self):
@@ -40,9 +40,9 @@ class Steamroller(BaseAgent):
 			self.tcount = 0
 
 		if TEST:
-			if not self.game_info.ball.location.x == -1000.0:## if not self.touch == self.game_info.ball.latest_touch.time_seconds:
+			if not self.game_info.ball.location.x == 1000.0:## if not self.touch == self.game_info.ball.latest_touch.time_seconds:
 				self.touch = self.game_info.ball.latest_touch.time_seconds
-			self.state = testState(self)
+				self.state = testState(self)
 
 		controls = self.state.execute()
 		self.renderer.draw_string_3d(self.game_info.my_car.location.tuple, 2, 2, f'{self.state.name}, {self.state.substate.name}', self.renderer.white())
@@ -124,9 +124,9 @@ class testState():
 	def execute(self):
 		
 		car_state = CarState(jumped=False, double_jumped=False, boost_amount=87, 
-                     physics=Physics(location = rlv3(1000, 2000, 20), velocity=rlv3(0,0,0), rotation=rlv3(0,-1,0), angular_velocity=rlv3(0,0,0)))
+                     physics=Physics(location = rlv3(-1000, -2000, 20), velocity=rlv3(0,0,0), rotation=rlv3(0,-1,0), angular_velocity=rlv3(0,0,0)))
 
-		ball_state = BallState(Physics(location=rlv3(-1000, -1100, 100), velocity=rlv3(0,0,0), rotation=rlv3(0,0,0), angular_velocity=rlv3(0,0,0)))
+		ball_state = BallState(Physics(location=rlv3(1000, 1100, 100), velocity=rlv3(0,0,0), rotation=rlv3(0,0,0), angular_velocity=rlv3(0,0,0)))
 
 		game_state = GameState(ball=ball_state, cars={self.agent.index: car_state})
 
